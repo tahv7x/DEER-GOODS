@@ -1,0 +1,6 @@
+{
+  "name": "HOMEVO | Premium Leather Goods",
+  "description": "A premium leather goods e-commerce store with an editorial aesthetic featuring a modular Bento Grid layout, real-time cart tracking, custom orders, wishlist, and admin dashboard controls.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

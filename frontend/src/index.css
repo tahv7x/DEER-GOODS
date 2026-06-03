@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600&family=Inter:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Cormorant Garamond", "Playfair Display", Georgia, serif;
+  --color-brand-bg: #FDFCF9;
+  --color-brand-dark: #1C1712;
+  --color-brand-muted: #7A6F62;
+  --color-brand-accent: #C4631C;
+  --color-brand-border: #E5E0D8;
+  --color-brand-warm: #F0EBE2;
+}
+
+html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+body {
+  background-color: #FDFCF9;
+  color: #1C1712;
+  font-family: var(--font-sans);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #FDFCF9; }
+::-webkit-scrollbar-thumb { background: #D4C5B0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #B5A99A; }
+
+/* Selection */
+::selection { background: rgba(196, 99, 28, 0.18); color: #1C1712; }
+
+/* Smooth anchor scroll */
+html { scroll-behavior: smooth; }
+
+/* Framer-safe transitions */
+* { box-sizing: border-box; }
+
+/* Image no-drag */
+img { user-select: none; -webkit-user-drag: none; }
+
+/* Remove button default */
+button { font-family: inherit; }
+
+/* Focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid #C4631C;
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* Card hover quick-view */
+.group:hover .quick-view { opacity: 1 !important; }
+
+/* Animate spin */
+@keyframes spin { to { transform: rotate(360deg); } }
+.animate-spin { animation: spin 1s linear infinite; }
