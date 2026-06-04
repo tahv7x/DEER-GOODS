@@ -45,7 +45,16 @@ const Home: React.FC = () => {
   useEffect(() => {
     apiClient.get('/products')
       .then(res => {
-        if (Array.isArray(res.data)) setFeatured(res.data.slice(0, 4));
+        if (Array.isArray(res.data)) {
+          // 🔴 HNA FIN DRNA L-FILTRE MAGIQUE 🔴
+          const recommended = res.data.filter(p => 
+            p.price < 350 && 
+            p.stock > 5 &&
+            !p.name.includes('Commande') && 
+            p.name !== 'Bespoke Custom Piece'
+          );
+          setFeatured(recommended.slice(0, 4));
+        }
       }).catch(err => console.error(err));
   }, []);
 
@@ -56,7 +65,6 @@ const Home: React.FC = () => {
 
       {/* ─── Hero: The Custom Order Gateway ─── */}
       <section className="relative bg-[#1C1712] overflow-hidden rounded-[32px] mx-4 sm:mx-8 lg:mx-12 my-6 sm:my-8 shadow-2xl">
-        {/* Blueprint grid effect for a "design/workshop" vibe */}
         <div className="absolute inset-0 opacity-[0.03]">
           <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
             <defs>
@@ -68,10 +76,10 @@ const Home: React.FC = () => {
           </svg>
         </div>
         
-        {/* Radial glow for depth */}
         <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] bg-[radial-gradient(ellipse,rgba(196,99,28,0.15)_0%,transparent_70%)] pointer-events-none" />
 
-          <div className="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-20 pt-16 pb-24 sm:pt-24 sm:pb-32 lg:pt-28 lg:pb-36">          <motion.div
+        <div className="relative max-w-7xl mx-auto px-6 sm:px-12 lg:px-20 pt-16 pb-24 sm:pt-24 sm:pb-32 lg:pt-28 lg:pb-36">
+          <motion.div
             variants={stagger} initial="hidden" animate="visible"
             className="max-w-3xl"
           >
@@ -94,12 +102,10 @@ const Home: React.FC = () => {
             </motion.p>
 
             <motion.div variants={cardVariants} className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {/* Primary CTA -> Custom Orders */}
               <Link to="/custom-orders" className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 bg-[#C4631C] text-white text-[11px] sm:text-xs tracking-[0.15em] font-bold uppercase rounded-xl hover:bg-[#D4A574] transition-all duration-300 shadow-[0_8px_24px_rgba(196,99,28,0.25)] font-sans">
                 <PenTool size={16} /> Request Custom Order
               </Link>
               
-              {/* Secondary CTA -> Shop */}
               <Link to="/shop" className="w-full sm:w-auto inline-flex items-center justify-center gap-3 px-8 py-4 bg-transparent text-[#FDFCF9] border border-[#FDFCF9]/20 text-[11px] sm:text-xs tracking-[0.15em] font-bold uppercase rounded-xl hover:bg-[#FDFCF9]/10 transition-all duration-300 font-sans">
                 View Ready Stock
               </Link>
@@ -138,7 +144,6 @@ const Home: React.FC = () => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           
-          {/* Box 1 (Light) */}
           <div 
             onClick={() => navigate('/shop')} 
             className="bg-white border border-[#E5E0D8] rounded-[32px] p-10 flex flex-col justify-between min-h-[340px] cursor-pointer group transition-all duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_24px_48px_rgba(28,23,18,0.06)]"
@@ -153,7 +158,6 @@ const Home: React.FC = () => {
             </span>
           </div>
 
-          {/* Box 2 (Dark) */}
           <div 
             onClick={() => navigate('/shop')} 
             className="bg-[#1C1712] text-white rounded-[32px] p-10 flex flex-col justify-between min-h-[340px] cursor-pointer group transition-all duration-500 ease-out hover:-translate-y-2 hover:shadow-[0_24px_48px_rgba(196,99,28,0.15)]"
@@ -218,7 +222,7 @@ const Home: React.FC = () => {
                   )}
                 </div>
 
-                {/* Info - N9esna l-Padding hna f mobile (p-3) */}
+                {/* Info */}
                 <div className="p-3 sm:p-5 space-y-1 sm:space-y-1.5 bg-white flex-1 flex flex-col justify-between">
                   <div>
                     <div className="flex justify-between items-start gap-2 mb-1 sm:mb-0">

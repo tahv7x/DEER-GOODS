@@ -46,8 +46,6 @@ router.post('/', authenticate, isAdmin, upload.array('images', 5), async(req: Re
         }
         
         let imageUrls: string[] = [];
-
-        // N-9raw tsawer l-9dam ila kano (Wakha f l-Ajout kaykouno khawyin, drnaha l-i7tiyat)
         if (existingImages) {
             try {
                 imageUrls = JSON.parse(existingImages);
@@ -56,11 +54,11 @@ router.post('/', authenticate, isAdmin, upload.array('images', 5), async(req: Re
             }
         }
 
-        // L-Upload dyal tsawer jdad
         if (files && files.length > 0) {
             const uploadPromises = files.map(async (file) => {
-                const fileName = `${Date.now()}-${file.originalname.replace(/\s/g,'_')}`;
-                
+                const fileExt = file.originalname.split('.').pop();
+                const randomStr = Math.random().toString(36).substring(2, 9);
+                const fileName = `${Date.now()}-${randomStr}.${fileExt}`;                
                 const { data: uploadData, error: uploadError } = await supabase
                     .storage
                     .from('products')
@@ -84,7 +82,6 @@ router.post('/', authenticate, isAdmin, upload.array('images', 5), async(req: Re
             imageUrls = [...imageUrls, ...newUrls]; // N-jm3ohom
         }
 
-        // L-Insert f Base de données
         const { data: newProduct, error: dbError } = await supabase
             .from('Product')
             .insert([{
@@ -93,7 +90,7 @@ router.post('/', authenticate, isAdmin, upload.array('images', 5), async(req: Re
                 price: parseFloat(price),
                 stock: parseInt(stock, 10),
                 categoryId,
-                imageUrls // Sifetna l-Array d tsawer
+                imageUrls
             }])
             .select()
             .single();
@@ -167,7 +164,6 @@ router.delete('/:id', authenticate, isAdmin, async (req: Request, res: Response)
     try {
         const { id } = req.params;
 
-        // 1. N-jebdou l-produit 9bel man-ms7ouh bach n-3erfou tsawer dyalo
         const { data: product, error: fetchError } = await supabase
             .from('Product')
             .select('imageUrls')
@@ -178,22 +174,19 @@ router.delete('/:id', authenticate, isAdmin, async (req: Request, res: Response)
             return res.status(404).json({ message: "Produit introuvable." });
         }
 
-        // 2. N-ms7ou t-tsawer mn Supabase Storage
         if (product.imageUrls && product.imageUrls.length > 0) {
-            // L-URL kat-koun twila, 7na khassna gha s-smiya d l-fichier l-khrania
             const pathsToRemove = product.imageUrls.map((url: string) => {
-                const parts = url.split('/products/'); // Kan-9ssmou l-url 3la smiyt l-bucket
-                return parts[parts.length - 1]; // Kan-hezzo ghir l-js2 l-kher (fileName)
+                const parts = url.split('/products/'); 
+                return parts[parts.length - 1]; 
             });
 
             const { error: storageError } = await supabase
                 .storage
                 .from('products')
-                .remove(pathsToRemove); // Supabase kay-9bel array dyal smiyat bach yms7hom f de9a
+                .remove(pathsToRemove); 
 
             if (storageError) {
                 console.error("Erreur (Storage) lors de la suppression des images :", storageError);
-                // Wakha t-w9e3 erreur f l-msi7 d tswira (matalan deja mmsou7a), kan-kmlou l-msi7 d l-produit
             }
         }
         const { error: deleteError } = await supabase

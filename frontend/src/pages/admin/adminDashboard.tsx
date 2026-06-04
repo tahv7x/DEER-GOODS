@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { DollarSign, ShoppingBag, Users, Package, AlertTriangle, Loader2, ArrowRight, TrendingUp } from 'lucide-react';
+import { DollarSign, ShoppingBag, Users, Package, AlertTriangle, Loader2, ArrowRight, TrendingUp, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../services/api';
 
@@ -20,41 +20,69 @@ const AdminDashboard: React.FC = () => {
   });
   
   // Data States
-  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
   const [lowStockProducts, setLowStockProducts] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
       setLoading(true);
       try {
-        const [ordersRes, usersRes, productsRes] = await Promise.all([
+        const [ordersRes, usersRes, productsRes, customOrdersRes] = await Promise.all([
           apiClient.get('/orders/admin'),
           apiClient.get('/users'),
-          apiClient.get('/products')
+          apiClient.get('/products'),
+          apiClient.get('/custom-orders/admin').catch(() => ({ data: [] }))
         ]);
 
         const orders = Array.isArray(ordersRes.data) ? ordersRes.data : [];
         const users = Array.isArray(usersRes.data) ? usersRes.data : [];
         const products = Array.isArray(productsRes.data) ? productsRes.data : [];
+        const customOrders = Array.isArray(customOrdersRes.data) ? customOrdersRes.data : [];
         
-        // ─── HNA BDNLNA L-7SSAB: GHIR LI DELIVERED HOMA LI K-YDKHLO F L-REVENUE ───
+        // ─── REVENUE: GHIR LI DELIVERED ───
         const revenue = orders
           .filter(o => o.status === 'DELIVERED')
           .reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
         const customersCount = users.filter(u => u.role === 'CUSTOMER').length;
 
+        // 🔴 FIX: N-7iydou les Custom Orders li wllaw 'ACCEPTED' (7it deja wllaw Commandes 79i9iyin)
+        const activeCustomOrders = customOrders.filter(c => c.status !== 'ACCEPTED');
+
         setStats({
           revenue,
-          totalOrders: orders.length,
+          totalOrders: orders.length + activeCustomOrders.length, // Hka ma-kayb9ach double-compte
           totalCustomers: customersCount,
           totalProducts: products.length
         });
 
-        const sortedOrders = [...orders].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime());
-        setRecentOrders(sortedOrders.slice(0, 6));
+        // ─── MIXING ORDERS & CUSTOM ORDERS ───
+        const formattedStandard = orders.map(o => ({
+          id: o.id,
+          type: 'Order', // 🔴 Bdelna s-smiya hna (Kant 'Standard')
+          customer: o.User?.email || 'N/A',
+          amount: o.totalAmount,
+          status: o.status,
+          date: o.created_at || o.createdAt
+        }));
 
-        const lowStock = products.filter(p => p.stock <= 5).sort((a, b) => a.stock - b.stock);
+        const formattedCustom = activeCustomOrders.map(c => ({
+          id: c.id,
+          type: 'Custom Order', // 🔴 Bdelna s-smiya hna (Kant 'Bespoke')
+          customer: c.User?.email || c.User?.name || 'N/A',
+          amount: c.estimatedPrice || 0,
+          status: c.status,
+          date: c.createdAt || c.created_at
+        }));
+
+        // Njm3ouhom w nrtbhom b t-tarikh (Jdid howa l-lowel)
+        const combined = [...formattedStandard, ...formattedCustom].sort((a, b) => 
+          new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+        );
+
+        setRecentActivity(combined.slice(0, 6)); // N-akhdo top 6
+
+        const lowStock = products.filter(p => p.stock <= 5 && p.name !== 'Bespoke Custom Piece').sort((a, b) => a.stock - b.stock);
         setLowStockProducts(lowStock.slice(0, 5));
 
       } catch (error) {
@@ -66,6 +94,14 @@ const AdminDashboard: React.FC = () => {
 
     fetchDashboardData();
   }, []);
+
+  const getStatusStyle = (status: string) => {
+    const s = status.toUpperCase();
+    if (['DELIVERED', 'ACCEPTED'].includes(s)) return 'bg-[#E6F4EA] text-[#2D7A45]';
+    if (['PENDING', 'REVIEWING'].includes(s)) return 'bg-[#FFF4E5] text-[#C4631C]';
+    if (['REJECTED', 'CANCELLED'].includes(s)) return 'bg-[#FEF0F0] text-[#A92828]';
+    return 'bg-[#E5F0FF] text-[#2B6CB0]'; // QUOTED, SHIPPED...
+  };
 
   const StatCard = ({ title, value, icon: Icon, color, delay }: any) => (
     <motion.div 
@@ -95,17 +131,17 @@ const AdminDashboard: React.FC = () => {
   }
 
   return (
-    <div className="w-full max-w-[1600px] mx-auto px-4 md:px-10 py-6 md:py-10 text-[#1C1712]">
+    <div className="w-full max-w-[1600px] mx-auto px-4 md:px-10 py-6 md:py-10 text-[#1C1712] font-sans">
       
       {/* ── HEADER ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8 md:mb-10">
         <div>
-          <h1 className="font-serif text-3xl md:text-4xl font-bold text-[#1C1712] mb-1 md:mb-2" style={{ fontFamily: "'Cormorant Garamond', Georgia, serif" }}>
+          <h1 className="text-3xl md:text-4xl font-black text-[#1C1712] mb-1 md:mb-2 tracking-tight">
             Overview
           </h1>
-          <p className="text-sm text-[#7A6F62]">Welcome back to your store dashboard.</p>
+          <p className="text-sm text-[#7A6F62] font-medium">Welcome back to your store dashboard.</p>
         </div>
-        <div className="bg-[#FDFCF9] px-4 py-2.5 rounded-xl border border-[#E5E0D8] text-sm font-semibold text-[#5A4F44] flex items-center gap-2 self-start sm:self-auto">
+        <div className="bg-[#FDFCF9] px-4 py-2.5 rounded-xl border border-[#E5E0D8] text-sm font-bold text-[#1C1712] flex items-center gap-2 self-start sm:self-auto">
           <TrendingUp size={18} color="#C4631C" /> Store Performance
         </div>
       </div>
@@ -113,62 +149,59 @@ const AdminDashboard: React.FC = () => {
       {/* ── STATS GRID ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 md:mb-10">
         <StatCard title="Total Revenue" value={MAD(stats.revenue)} icon={DollarSign} color={{ bg: '#E6F4EA', text: '#2D7A45' }} delay={0} />
-        <StatCard title="Total Orders" value={stats.totalOrders} icon={ShoppingBag} color={{ bg: '#E5F0FF', text: '#2B6CB0' }} delay={0.1} />
+        <StatCard title="Total Activity" value={stats.totalOrders} icon={ShoppingBag} color={{ bg: '#E5F0FF', text: '#2B6CB0' }} delay={0.1} />
         <StatCard title="Customers" value={stats.totalCustomers} icon={Users} color={{ bg: '#F0EBE2', text: '#C4631C' }} delay={0.2} />
         <StatCard title="Products" value={stats.totalProducts} icon={Package} color={{ bg: '#FAFAF8', text: '#5A4F44' }} delay={0.3} />
       </div>
 
-      {/* ── MAIN CONTENT: ORDERS & ALERTS ── */}
+      {/* ── MAIN CONTENT ── */}
       <div className="flex flex-col lg:flex-row gap-6 md:gap-8">
         
-        {/* RECENT ORDERS */}
+        {/* RECENT ACTIVITY */}
         <motion.div 
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} 
           className="w-full lg:w-2/3 bg-white rounded-[20px] border border-[#E5E0D8] overflow-hidden shadow-[0_4px_20px_rgba(28,23,18,0.03)]"
         >
           <div className="px-4 py-4 md:px-8 md:py-6 border-b border-[#E5E0D8] flex items-center justify-between">
-            <h3 className="text-lg font-bold text-[#1C1712]">Recent Orders</h3>
-            <Link to="/admin/orders" className="text-xs md:text-[13px] font-semibold text-[#C4631C] no-underline flex items-center gap-1.5 hover:opacity-80 transition-opacity">
-              View All <ArrowRight size={16} />
-            </Link>
+            <h3 className="text-lg font-black text-[#1C1712]">Recent Activity</h3>
           </div>
           
           <div className="overflow-x-auto">
-            <table className="w-full border-collapse text-left min-w-[500px]">
+            <table className="w-full border-collapse text-left min-w-[540px]">
               <thead>
                 <tr className="bg-[#FAFAF8] border-b border-[#E5E0D8]">
-                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-bold text-[#9C8E80] uppercase tracking-wider">Order ID</th>
-                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-bold text-[#9C8E80] uppercase tracking-wider">Customer</th>
-                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-bold text-[#9C8E80] uppercase tracking-wider">Amount</th>
-                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-bold text-[#9C8E80] uppercase tracking-wider text-right">Status</th>
+                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-extrabold text-[#9C8E80] uppercase tracking-wider">Reference</th>
+                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-extrabold text-[#9C8E80] uppercase tracking-wider">Customer</th>
+                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-extrabold text-[#9C8E80] uppercase tracking-wider">Amount</th>
+                  <th className="px-4 py-3 md:px-8 md:py-4 text-[11px] font-extrabold text-[#9C8E80] uppercase tracking-wider text-right">Status</th>
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.length === 0 ? (
+                {recentActivity.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="p-10 text-center text-[#9C8E80] text-sm">No orders yet.</td>
+                    <td colSpan={4} className="p-10 text-center text-[#9C8E80] text-sm font-medium">No activity yet.</td>
                   </tr>
                 ) : (
-                  recentOrders.map((order, idx) => (
-                    <tr key={order.id} className={`hover:bg-[#FDFCF9] transition-colors ${idx !== recentOrders.length - 1 ? 'border-b border-[#F0EBE2]' : ''}`}>
+                  recentActivity.map((item, idx) => (
+                    <tr key={item.id} className={`hover:bg-[#FDFCF9] transition-colors ${idx !== recentActivity.length - 1 ? 'border-b border-[#F0EBE2]' : ''}`}>
                       <td className="px-4 py-3 md:px-8 md:py-5">
-                        <p className="text-sm font-bold text-[#1C1712] mb-1">#{shortId(order.id)}</p>
-                        <p className="text-xs text-[#9C8E80]">{formatDate(order.created_at)}</p>
+                        <div className="flex items-center gap-2 mb-1">
+                          {item.type === 'Custom Order' ? <Sparkles size={12} color="#C4631C" /> : <ShoppingBag size={12} color="#9C8E80" />}
+                          <p className="text-sm font-bold text-[#1C1712]">#{shortId(item.id)}</p>
+                        </div>
+                        <p className="text-[11px] font-bold text-[#9C8E80] uppercase tracking-wider">
+                          {item.type} • {formatDate(item.date)}
+                        </p>
                       </td>
-                      <td className="px-4 py-3 md:px-8 md:py-5 text-sm text-[#5A4F44]">
-                        {order.User?.email || 'N/A'}
+                      <td className="px-4 py-3 md:px-8 md:py-5 text-sm text-[#5A4F44] font-medium">
+                        {item.customer}
                       </td>
-                      <td className="px-4 py-3 md:px-8 md:py-5 text-sm font-bold text-[#1C1712]">
-                        {MAD(order.totalAmount)}
+                      <td className="px-4 py-3 md:px-8 md:py-5 text-sm font-black text-[#1C1712]">
+                        {item.amount > 0 ? MAD(item.amount) : <span className="text-[#9C8E80] italic font-medium text-xs">Pending Quote</span>}
                       </td>
                       <td className="px-4 py-3 md:px-8 md:py-5 text-right">
-                        <span 
-                          className={`text-[11px] font-bold tracking-wider px-3 py-1.5 rounded-lg
-                            ${order.status === 'DELIVERED' ? 'bg-[#E6F4EA] text-[#2D7A45]' : 
-                              order.status === 'PENDING' ? 'bg-[#FFF4E5] text-[#C4631C]' : 
-                              'bg-[#E5F0FF] text-[#2B6CB0]'}`}
-                        >
-                          {order.status}
+                        <span className={`text-[10px] font-extrabold tracking-wider px-3 py-1.5 rounded-lg uppercase ${getStatusStyle(item.status)}`}>
+                          {item.status}
                         </span>
                       </td>
                     </tr>
@@ -186,11 +219,11 @@ const AdminDashboard: React.FC = () => {
         >
           <div className="px-4 py-4 md:px-8 md:py-6 border-b border-[#E5E0D8] flex items-center gap-3">
             <AlertTriangle size={20} color="#A92828" />
-            <h3 className="text-lg font-bold text-[#1C1712]">Low Stock</h3>
+            <h3 className="text-lg font-black text-[#1C1712]">Low Stock Alert</h3>
           </div>
           <div className="py-2 flex-1">
             {lowStockProducts.length === 0 ? (
-              <div className="p-8 md:p-10 text-center text-[#9C8E80] text-sm">
+              <div className="p-8 md:p-10 text-center text-[#9C8E80] text-sm font-medium">
                 All products are well stocked.
               </div>
             ) : (
@@ -205,14 +238,14 @@ const AdminDashboard: React.FC = () => {
                     </div>
                     <div>
                       <p className="text-[13px] md:text-sm font-bold text-[#1C1712] mb-1 line-clamp-1">{product.name}</p>
-                      <p className="text-xs text-[#7A6F62]">{product.Category?.name || 'Uncategorized'}</p>
+                      <p className="text-[11px] font-bold uppercase tracking-wider text-[#7A6F62]">{product.Category?.name || 'Uncategorized'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 md:gap-3 shrink-0 ml-2">
-                    <span className={`text-[11px] md:text-[13px] font-bold ${product.stock === 0 ? 'text-[#A92828]' : 'text-[#C4631C]'}`}>
+                    <span className={`text-[11px] md:text-[13px] font-black ${product.stock === 0 ? 'text-[#A92828]' : 'text-[#C4631C]'}`}>
                       {product.stock} left
                     </span>
-                    <Link to="/admin/products" className="p-1.5 md:p-2 bg-[#FDFCF9] border border-[#E5E0D8] rounded-lg text-[#5A4F44] hover:bg-[#F0EBE2] transition-colors">
+                    <Link to="/admin/products" className="p-1.5 md:p-2 bg-[#FDFCF9] border border-[#E5E0D8] rounded-lg text-[#5A4F44] hover:bg-[#1C1712] hover:text-white hover:border-[#1C1712] transition-all">
                       <ArrowRight size={14} className="md:w-4 md:h-4" />
                     </Link>
                   </div>

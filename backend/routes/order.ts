@@ -34,7 +34,7 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
         const orderItemsData = items.map((item: any) => ({
             id: crypto.randomUUID(),
             orderId: orderId,
-            productId: item.productId,
+            productId: item.productId || item.id,
             quantity: parseInt(item.quantity, 10),
             priceAtPurchase: parseFloat(item.price)
         }));
@@ -44,6 +44,28 @@ router.post('/', authenticate, async (req: Request, res: Response) => {
             .insert(orderItemsData);
             
         if (itemsError) throw itemsError;
+
+        for (const item of items) {
+            const targetId = item.productId || item.id;
+
+            const { data: product, error: fetchErr } = await supabase.from('Product').select('stock').eq('id', targetId).single();
+            
+            if (fetchErr) {
+                console.error("ERREUR FETCH STOCK:", fetchErr);
+            }
+
+            if (product) {
+                const newStock = Math.max(0, product.stock - parseInt(item.quantity, 10));
+                
+                const { error: updateErr } = await supabase.from('Product').update({ stock: newStock }).eq('id', targetId);
+                
+                if (updateErr) {
+                    console.error("ERREUR UPDATE STOCK:", updateErr);
+                }
+            } else {
+                console.log("Produit introuvable");
+            }
+        }
 
         res.status(201).json({
             message: "Commande effectuée avec succès.",
@@ -61,7 +83,8 @@ router.get('/my-orders', authenticate, async (req: Request, res: Response) => {
         const { data: orders, error } = await supabase
             .from('Order')
             .select('*,OrderItem(*,Product(*))')
-            .eq('userId', userId);
+            .eq('userId', userId)
+            .order('createdAt', { ascending: false }); 
             
         if (error) throw error;
         res.json(orders);
@@ -83,14 +106,14 @@ router.get('/admin', authenticate, isAdmin, async (req: Request, res: Response) 
 
         const { data: users } = await supabase
             .from('User')
-            .select('id, email')
+            .select('id, email, name')
             .in('id', userIds);
 
         const ordersWithUsers = orders.map(order => {
             const userMatch = users?.find(u => u.id === order.userId);
             return {
                 ...order,
-                User: userMatch ? { email: userMatch.email } : { email: 'Email introuvable' }
+                User: userMatch ? { email: userMatch.email, name: userMatch.name } : { email: 'Email introuvable' }
             };
         });
 
@@ -101,7 +124,6 @@ router.get('/admin', authenticate, isAdmin, async (req: Request, res: Response) 
     }
 });
 
-// ─── 📦 UPDATE STATUS & STOCK LOGIC ───
 router.put('/:id/status', authenticate, isAdmin, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -111,7 +133,6 @@ router.put('/:id/status', authenticate, isAdmin, async (req: Request, res: Respo
             return res.status(400).json({ message: "Le statut de la commande est obligatoire." });
         }
 
-        // 1. N-jbdou l-Commande l-9dima bach n-9arno l-status dyalha
         const { data: order, error: fetchError } = await supabase
             .from('Order')
             .select('status, OrderItem(productId, quantity)')
@@ -122,29 +143,24 @@ router.put('/:id/status', authenticate, isAdmin, async (req: Request, res: Respo
             return res.status(404).json({ message: "Commande introuvable." });
         }
 
-        // 2. LOGIQUE DYAL S-STOCK 📦
-        // Ila status jdid howa DELIVERED w l-9dim makanch DELIVERED -> N-n9so s-stock
-        if (status === 'DELIVERED' && order.status !== 'DELIVERED') {
-            for (const item of order.OrderItem as any[]) {
-                const { data: product } = await supabase.from('Product').select('stock').eq('id', item.productId).single();
-                if (product) {
-                    const newStock = Math.max(0, product.stock - item.quantity); // n-t2kkdou may-hbtch t7t 0
-                    await supabase.from('Product').update({ stock: newStock }).eq('id', item.productId);
-                }
-            }
-        }
-
-        // BONUS: Ila commande rj3at (RETURNED / CANCELED) w kant deja DELIVERED -> N-rddou s-stock
-        if ((status === 'RETURNED' || status === 'CANCELED') && order.status === 'DELIVERED') {
+        if (['RETURNED', 'CANCELED'].includes(status) && !['RETURNED', 'CANCELED'].includes(order.status)) {
             for (const item of order.OrderItem as any[]) {
                 const { data: product } = await supabase.from('Product').select('stock').eq('id', item.productId).single();
                 if (product) {
                     await supabase.from('Product').update({ stock: product.stock + item.quantity }).eq('id', item.productId);
                 }
             }
+        } 
+        else if (!['RETURNED', 'CANCELED'].includes(status) && ['RETURNED', 'CANCELED'].includes(order.status)) {
+             for (const item of order.OrderItem as any[]) {
+                const { data: product } = await supabase.from('Product').select('stock').eq('id', item.productId).single();
+                if (product) {
+                    const newStock = Math.max(0, product.stock - item.quantity);
+                    await supabase.from('Product').update({ stock: newStock }).eq('id', item.productId);
+                }
+            }
         }
 
-        // 3. N-beddlou l-Status dyal l-Commande
         const { data: updatedOrder, error } = await supabase
             .from('Order')
             .update({ status })
@@ -161,19 +177,16 @@ router.put('/:id/status', authenticate, isAdmin, async (req: Request, res: Respo
     }
 });
 
-// Cancel Order (Ghir l-klyan li y-9der y-annuler l-commande dyalo w khassha t-koun PENDING)
 router.put('/:id/cancel', authenticate, async (req: Request, res: Response) => {
   try {
     const orderId = req.params.id;
     
-    // N-jbdou l-ID b ga3 l-i7timalat li kaynin f l-Token dyal Supabase
     const userPayload = (req as any).user;
     const userId = userPayload.id || userPayload.userId || userPayload.sub;
 
-    // 1. N-9elbou 3la l-commande bach n-choufou wach dyal had l-klyan
     const { data: order, error: fetchError } = await supabase
       .from('Order')
-      .select('*')
+      .select('*, OrderItem(productId, quantity)')
       .eq('id', orderId)
       .single();
 
@@ -181,17 +194,21 @@ router.put('/:id/cancel', authenticate, async (req: Request, res: Response) => {
       return res.status(404).json({ message: "Commande introuvable" });
     }
 
-    // Check wach l-commande dyalo
     if (order.userId !== userId) {
       return res.status(403).json({ message: "Accès refusé. Cette commande ne vous appartient pas." });
     }
 
-    // Check wach ba9a PENDING
     if (order.status !== 'PENDING') {
       return res.status(400).json({ message: "Vous ne pouvez annuler qu'une commande en attente (PENDING)" });
     }
 
-    // 2. N-beddlou l-Status l CANCELED
+    for (const item of order.OrderItem as any[]) {
+        const { data: product } = await supabase.from('Product').select('stock').eq('id', item.productId).single();
+        if (product) {
+            await supabase.from('Product').update({ stock: product.stock + item.quantity }).eq('id', item.productId);
+        }
+    }
+
     const { error: updateError } = await supabase
       .from('Order')
       .update({ status: 'CANCELED' })
@@ -199,7 +216,7 @@ router.put('/:id/cancel', authenticate, async (req: Request, res: Response) => {
 
     if (updateError) throw updateError;
 
-    res.json({ message: "Commande annulée avec succès" });
+    res.json({ message: "Commande annulée avec succès. Le stock a été restitué." });
   } catch (error) {
     console.error("Erreur Cancel Order:", error);
     res.status(500).json({ message: "Erreur serveur" });

@@ -14,7 +14,7 @@ import autoTable from 'jspdf-autotable';
 
 interface Product { name: string; imageUrls: string[] | null; }
 interface OrderItem { id: string; quantity: number; priceAtPurchase: number; Product: Product | null; }
-interface UserData { email: string; }
+interface UserData { email: string; name:string}
 interface Order {
   id: string;
   createdAt: string;
@@ -56,7 +56,7 @@ const openWhatsApp = (phone: string | null, orderId: string, address: string | n
   const intlPhone = toWhatsAppNumber(phone);
   const productsList = items.map(i => `• ${i.quantity}x ${i.Product?.name || 'Produit'}`).join('\n');
   const msg = encodeURIComponent(
-    `Salam \n\nHadi équipe *Deer Goods*. Kantwaslou m3ak bash n'confirmew la commande dyalek (#${shortId(orderId)}).\n\n*Talabiya dyalek:*\n${productsList}\n\n*Taman l'ijmali:* ${MAD(total)}\n\n*Adresse d'envoi:* ${address || '...'}\n\nWash n'confirmew lik l'irssal? (Jawbna b Ah awla La) 🙏`
+    `Salam \n\nHadi équipe *Deer Goods*. Kantwaslou m3ak bash n'confirmew la commande dyalek (#${shortId(orderId)}).\n\n*Talabiya dyalek:*\n${productsList}\n\n*Taman l'ijmali:* ${MAD(total)}\n\n*Adresse d'envoi:* ${address || '...'}\n\nWash n'confirmew lik La Commande ?`
   );
   window.open(`https://wa.me/${intlPhone}?text=${msg}`, '_blank');
 };
@@ -135,10 +135,12 @@ const AdminOrders: React.FC = () => {
     finally { setUpdatingId(null); }
   };
 
-  const generateInvoice = (order: Order) => {
+const generateInvoice = (order: Order) => {
     const doc = new jsPDF();
     const invoiceId = shortId(order.id);
     const orderDate = new Date(order.createdAt).toLocaleDateString('fr-FR');
+    
+    const customerName = order.User?.name || (order.User?.email ? order.User.email.split('@')[0] : 'Client');
 
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
@@ -155,30 +157,39 @@ const AdminOrders: React.FC = () => {
     doc.setFontSize(18);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(196, 99, 28); 
-    doc.text("FACTURE", 150, 22);
+    // Kahhezna l-Facture shwya l-issr bash tji nishane
+    doc.text("FACTURE", 140, 22);
 
     doc.setFontSize(10);
     doc.setTextColor(28, 23, 18);
-    doc.text(`N° Commande : #${invoiceId}`, 150, 30);
+    doc.text(`N° Commande : #${invoiceId}`, 140, 30);
     doc.setFont("helvetica", "normal");
-    doc.text(`Date : ${orderDate}`, 150, 35);
-    doc.text(`Paiement : ${order.paymentMethod}`, 150, 40);
+    doc.text(`Date : ${orderDate}`, 140, 36);
+    doc.text(`Paiement : ${order.paymentMethod}`, 140, 42);
 
     doc.setDrawColor(229, 224, 216); 
-    doc.line(14, 48, 196, 48);
+    doc.line(14, 50, 196, 50);
 
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.setTextColor(28, 23, 18);
-    doc.text("FACTURÉ À :", 14, 60);
+    doc.text("FACTURÉ À :", 14, 62);
     
     doc.setFontSize(10);
     doc.setFont("helvetica", "normal");
     doc.setTextColor(90, 79, 68);
-    doc.text(`Nom : ${order.User?.email || 'N/A'}`, 14, 63);
-    doc.text(`Email : ${order.User?.email || 'N/A'}`, 14, 66);
-    doc.text(`Téléphone : ${order.phone || 'Non renseigné'}`, 14, 71);
-    doc.text(`Adresse : ${order.shippingAddress || 'Non renseignée'}`, 14, 76);
+    
+    // 🔴 FIX L-Espace (Zedt +6 points bin kol ligne f blast +3)
+    doc.text(`Nom : ${customerName}`, 14, 69);
+    doc.text(`Email : ${order.User?.email || 'N/A'}`, 14, 75);
+    doc.text(`Téléphone : ${order.phone || 'Non renseigné'}`, 14, 81);
+    
+    // 🔴 FIX: Text wrap l-adresse ila kant twila bash mathrbsh 3la shasha
+    const addressLines = doc.splitTextToSize(`Adresse : ${order.shippingAddress || 'Non renseignée'}`, 100);
+    doc.text(addressLines, 14, 87);
+
+    // Dynamic StartY l-Table 3la 7sab toul dyal l-adresse
+    const tableStartY = 87 + (addressLines.length * 5) + 6;
 
     // 4. Jdwal (Table) dyal l-Produits
     const tableColumn = ["Produit", "Prix Unitaire", "Quantité", "Total"];
@@ -190,7 +201,7 @@ const AdminOrders: React.FC = () => {
     ]);
 
     autoTable(doc, {
-      startY: 90,
+      startY: tableStartY,
       head: [tableColumn],
       body: tableRows,
       theme: 'plain',

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Search, Edit2, Trash2, Loader2, Image as ImageIcon,
-  X, UploadCloud, Save, ChevronDown, AlertTriangle, Package,
+  X, UploadCloud, Save, ChevronDown, AlertTriangle, Package, RefreshCw
 } from 'lucide-react';
 import apiClient from '../../services/api';
 
@@ -285,6 +285,7 @@ const AdminProducts: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
@@ -292,15 +293,21 @@ const AdminProducts: React.FC = () => {
   const [productToDelete, setProductToDelete] = useState<Product | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
-  const fetchData = async () => {
-    setLoading(true);
+  const fetchData = async (silent = false) => {
+    silent ? setRefreshing(true) : setLoading(true);
     try {
       const [rP, rC] = await Promise.all([apiClient.get('/products'), apiClient.get('/categories')]);
-      const sortedProducts = (Array.isArray(rP.data) ? rP.data : []).sort((a, b) => a.name.localeCompare(b.name));
+      
+      // 🔴 FIX 1: N-khebiw ga3 les Produits dyal Custom Orders mn l'Admin (li fihom Commande f smiyethom awla smiythom Bespoke)
+      const validProducts = (Array.isArray(rP.data) ? rP.data : []).filter(p => 
+        !p.name.includes('Commande') && p.name !== 'Bespoke Custom Piece'
+      );
+      
+      const sortedProducts = validProducts.sort((a, b) => a.name.localeCompare(b.name));
       setProducts(sortedProducts);
       setCategories(Array.isArray(rC.data) ? rC.data : []);
     } catch (e) { console.error(e); }
-    finally { setLoading(false); }
+    finally { setLoading(false); setRefreshing(false); }
   };
 
   useEffect(() => { fetchData(); }, []);
@@ -312,7 +319,7 @@ const AdminProducts: React.FC = () => {
     setDeleteLoading(true);
     try {
       await apiClient.delete(`/products/${productToDelete.id}`);
-      setIsDeleteOpen(false); setProductToDelete(null); fetchData();
+      setIsDeleteOpen(false); setProductToDelete(null); fetchData(true);
     } catch (e: any) {
       alert(e.response?.data?.message || 'Could not delete product.');
     } finally { setDeleteLoading(false); }
@@ -331,6 +338,16 @@ const AdminProducts: React.FC = () => {
         </div>
 
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 md:gap-4 w-full md:w-auto">
+          
+          {/* 🔴 FIX 2: Bouton Refresh bach njibou Stock jdid mli t-w9e3 chi Mbi3a */}
+          <button
+             onClick={() => fetchData(true)}
+             className="flex items-center justify-center gap-2 px-4 py-3 bg-[#FDFCF9] border border-[#E5E0D8] rounded-xl text-[13px] font-bold text-[#5A4F44] tracking-[0.08em] shadow-sm hover:bg-[#F0EBE2] transition-colors"
+          >
+             <RefreshCw size={16} className={refreshing ? 'animate-spin' : ''} />
+             <span className="hidden sm:inline">Refresh</span>
+          </button>
+
           {/* Search */}
           <div className="relative w-full sm:w-[280px]">
             <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#9C8E80]" />
@@ -366,7 +383,7 @@ const AdminProducts: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {loading ? (
+              {loading && !refreshing ? (
                 <tr><td colSpan={5} className="p-20 text-center">
                   <Loader2 size={28} color="#C4631C" className="animate-spin mx-auto block" />
                 </td></tr>
@@ -466,7 +483,7 @@ const AdminProducts: React.FC = () => {
         )}
       </div>
 
-      <ProductFormDrawer isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={fetchData} categories={categories} productToEdit={productToEdit} />
+      <ProductFormDrawer isOpen={isFormOpen} onClose={() => setIsFormOpen(false)} onSuccess={() => fetchData(true)} categories={categories} productToEdit={productToEdit} />
       <DeleteConfirmModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={handleDelete} product={productToDelete} loading={deleteLoading} />
     </div>
   );

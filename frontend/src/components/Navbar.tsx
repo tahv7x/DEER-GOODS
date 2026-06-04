@@ -99,12 +99,11 @@ export const Navbar: React.FC = () => {
     }, 600);
   };
 
-  // ─── ZEDNA MY ORDERS HNA (Katban ghir l Klyan) ───
   const navLinks = [
     { to: '/shop', label: 'Shop' },
-    { to: '/about', label: 'Our Story' },
+    ...(user && user.role !== 'ADMIN' ? [{ to: '/orders', label: 'My Orders' }] : []),
     { to: '/custom-orders', label: 'Custom Orders' },
-    ...(user && user.role !== 'ADMIN' ? [{ to: '/orders', label: 'My Orders' }] : [])
+    { to: '/about', label: 'Our Story' },
   ];
 
   return (
@@ -138,8 +137,7 @@ export const Navbar: React.FC = () => {
             </Link>
 
             {/* ── Desktop Nav ── */}
-            <nav className="hidden md:flex" style={{ alignItems: 'center', gap: 32 }}>
-              {navLinks.map(l => (
+            <nav className="hidden md:flex" style={{ alignItems: 'center', gap: 32, flex: 1, justifyContent: 'center' }}>              {navLinks.map(l => (
                 <Link key={l.to} to={l.to} style={{
                   textDecoration: 'none', fontSize: 11, letterSpacing: '0.16em',
                   textTransform: 'uppercase', fontWeight: 600,

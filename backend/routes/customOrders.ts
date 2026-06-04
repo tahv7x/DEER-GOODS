@@ -16,13 +16,11 @@ router.post('/', authenticate, upload.single('image'), async (req: Request, res:
             return res.status(400).json({ message: "La description est obligatoire." });
         }
 
-        // Khedamin b req.file li jaya mn la config dyalk
         if (req.file) {
             const fileExt = req.file.originalname.split('.').pop();
             const fileName = `${userId}-${Date.now()}.${fileExt}`;
             const filePath = `custom-orders/${fileName}`;
 
-            // Upload l'Supabase Storage f bucket 'images'
             const { error: uploadError } = await supabase.storage
                 .from('images')
                 .upload(filePath, req.file.buffer, {
@@ -31,7 +29,6 @@ router.post('/', authenticate, upload.single('image'), async (req: Request, res:
 
             if (uploadError) throw uploadError;
 
-            // Récupération dyal l'URL public
             const { data: { publicUrl } } = supabase.storage
                 .from('images')
                 .getPublicUrl(filePath);
@@ -62,7 +59,6 @@ router.post('/', authenticate, upload.single('image'), async (req: Request, res:
     }
 });
 
-// 2. CLIENT : Ychouf les demandes dyalo
 router.get('/my-requests', authenticate, async (req: Request, res: Response) => {
     try {
         const userId = req.user?.id;
@@ -80,7 +76,6 @@ router.get('/my-requests', authenticate, async (req: Request, res: Response) => 
     }
 });
 
-// 3. ADMIN : Ychouf ga3 les demandes dyal l'klyan
 router.get('/admin', authenticate, isAdmin, async (req: Request, res: Response) => {
     try {
         const { data: requests, error } = await supabase
@@ -96,7 +91,6 @@ router.get('/admin', authenticate, isAdmin, async (req: Request, res: Response) 
     }
 });
 
-// 4. ADMIN : Yjaweb l'klyan w y3tih taman (Quote)
 router.put('/:id/quote', authenticate, isAdmin, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
@@ -123,13 +117,12 @@ router.put('/:id/quote', authenticate, isAdmin, async (req: Request, res: Respon
         res.status(500).json({ message: "Erreur lors de la mise à jour du prix." });
     }
 });
-// 5. CLIENT / ADMIN : Tbeddel l'état w T-généri Commande 79i9iya
+
 router.put('/:id/status', authenticate, async (req: Request, res: Response) => {
     try {
         const { id } = req.params;
         const { status } = req.body;
 
-        // 1. Njbdou CustomOrder bash nakhdo l'budget w userId
         const { data: customOrder, error: fetchError } = await supabase
             .from('CustomOrder')
             .select('*')
@@ -138,52 +131,65 @@ router.put('/:id/status', authenticate, async (req: Request, res: Response) => {
 
         if (fetchError || !customOrder) throw new Error("Custom order introuvable");
 
-        // 2. LA MAGIE ✨: Ila l'klyan 9bel (ACCEPTED), n-kriyiw commande officielle !
         if (status === 'ACCEPTED' && customOrder.status !== 'ACCEPTED') {
             
-            // a. N9elbou 3la produit m-khbi smyto "Bespoke Custom Piece"
-            let { data: bespokeProduct } = await supabase
-                .from('Product')
-                .select('id')
-                .eq('name', 'Bespoke Custom Piece')
-                .single();
-
-            // b. Ila makansh had l'produit, n-kriyiwh f l'khalafiya
-            if (!bespokeProduct) {
-                const { data: category } = await supabase.from('Category').select('id').limit(1).single();
-                
-                const { data: newProd, error: prodErr } = await supabase.from('Product').insert([{
-                    id: crypto.randomUUID(),
-                    name: 'Bespoke Custom Piece',
-                    description: 'Commande sur-mesure validée par le client.',
-                    price: 0,
-                    stock: 9999, // Stock infini
-                    categoryId: category?.id
-                }]).select().single();
-                
-                if (prodErr) throw prodErr;
-                bespokeProduct = newProd;
-            }
-
-            // 🚨 HADI HIYA LI SAKKTAT TYPESCRIPT 🚨
-            if (!bespokeProduct) {
-                throw new Error("Impossible de trouver ou créer le produit Bespoke.");
-            }
-
-            // c. Njbdou num d'téléphone dyal l'client
             const { data: userData } = await supabase
                 .from('User')
-                .select('phone')
+                .select('name, phone')
                 .eq('id', customOrder.userId)
                 .single();
 
-            // d. KRIYI L'COMMANDE (Order)
+            const clientName = userData?.name || 'Client';
+            const dynamicProductName = `${clientName} Commande`;
+
+            let { data: customCategory } = await supabase
+                .from('Category')
+                .select('id')
+                .eq('name', 'Custom Orders')
+                .single();
+
+            if (!customCategory) {
+                const { data: newCat, error: catErr } = await supabase
+                    .from('Category')
+                    .insert([{ 
+                        id: crypto.randomUUID(), 
+                        name: 'Custom Orders', 
+                        description: 'Catégorie cachée pour les commandes sur-mesure' 
+                    }])
+                    .select()
+                    .single();
+                if (catErr) throw catErr;
+                customCategory = newCat;
+            }
+
+            if (!customCategory) {
+                throw new Error("Erreur critique: Catégorie introuvable");
+            }
+
+            const productImages = customOrder.imageUrl ? [customOrder.imageUrl] : [];
+
+            const { data: bespokeProduct, error: prodErr } = await supabase
+                .from('Product')
+                .insert([{
+                    id: crypto.randomUUID(),
+                    name: dynamicProductName,
+                    description: `Commande sur-mesure validée par ${clientName}.`,
+                    price: 0,
+                    stock: 1,
+                    categoryId: customCategory.id,
+                    imageUrls: productImages
+                }])
+                .select()
+                .single();
+                
+            if (prodErr) throw prodErr;
+
             const orderId = crypto.randomUUID();
             const { error: orderError } = await supabase.from('Order').insert([{
                 id: orderId,
                 userId: customOrder.userId,
                 totalAmount: customOrder.estimatedPrice,
-                paymentMethod: 'COD', // Par défaut
+                paymentMethod: 'COD',
                 status: 'PENDING',
                 phone: userData?.phone || null,
                 shippingAddress: 'À confirmer via WhatsApp' 
@@ -191,11 +197,10 @@ router.put('/:id/status', authenticate, async (req: Request, res: Response) => {
 
             if (orderError) throw orderError;
 
-            // e. Lsse9 dak l'produit (OrderItem) m3a l'Commande
             const { error: itemError } = await supabase.from('OrderItem').insert([{
                 id: crypto.randomUUID(),
                 orderId: orderId,
-                productId: bespokeProduct.id, // Daba TypeScript merta7 100%
+                productId: bespokeProduct.id, 
                 quantity: 1,
                 priceAtPurchase: customOrder.estimatedPrice
             }]);
@@ -203,7 +208,6 @@ router.put('/:id/status', authenticate, async (req: Request, res: Response) => {
             if (itemError) throw itemError;
         }
 
-        // 3. N-updatiw status dyal l'CustomOrder bash ytwta9 (Save)
         const { data: updatedData, error } = await supabase
             .from('CustomOrder')
             .update({ status })
@@ -219,4 +223,5 @@ router.put('/:id/status', authenticate, async (req: Request, res: Response) => {
         res.status(500).json({ message: "Erreur lors de la mise à jour du statut." });
     }
 });
+
 export default router;

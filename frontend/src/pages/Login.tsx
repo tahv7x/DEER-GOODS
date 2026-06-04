@@ -63,9 +63,18 @@ const Login: React.FC = () => {
     setError('');
 
     try{
-      const response = await apiClient.post('/auth/login',formData);
-      const {token,user} = response.data;
+      // Authenticate directly with Supabase frontend client to establish session (for auto token refresh)
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
 
+      if (authError) throw authError;
+
+      const user = authData.user;
+      const token = authData.session.access_token;
+
+      // Fetch user role from database
       const { data: dbUser } = await supabase
         .from('User')
         .select('role')
@@ -75,10 +84,11 @@ const Login: React.FC = () => {
       const realRole = dbUser?.role || 'CUSTOMER';
       const userName = user?.user_metadata?.name ;
       const avatar = user?.user_metadata?.avatar_url;
+      
       login(token, { 
         id: user.id, 
         name: userName, 
-        email: user.email, 
+        email: user.email || '', 
         role: realRole,
         avatar
       });
@@ -90,7 +100,8 @@ const Login: React.FC = () => {
       }
     }catch(err: any){
       console.error("Login error : ",err);
-      setError(err.response.data.message);
+      // Fallback for custom or Supabase error message
+      setError(err.message || "An error occurred during login.");
     }finally{
       setLoading(false);
     }

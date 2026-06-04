@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight, Loader2, Eye, EyeOff, AlertCircle, User, Mail, Lock, Phone } from 'lucide-react';
 import apiClient from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import supabase from '../config/supabaseClient';
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const fadeUp = {
@@ -87,14 +88,31 @@ const Register: React.FC = () => {
     setLoading(true);
     setError('');
     try {
+      // Create user via backend
       await apiClient.post('/auth/register', formData);
-      const res = await apiClient.post('/auth/login', { email: formData.email, password: formData.password });
-      const { token, user } = res.data;
-      login(token, { id: user.id, name: user.user_metadata?.name || formData.name, email: user.email, role: 'CUSTOMER' });
+      
+      // Auto login via Supabase frontend client to establish native session
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password
+      });
+
+      if (authError) throw authError;
+
+      const user = authData.user;
+      const token = authData.session.access_token;
+      
+      login(token, { 
+        id: user.id, 
+        name: user.user_metadata?.name || formData.name, 
+        email: user.email || '', 
+        role: 'CUSTOMER' 
+      });
+      
       setStep(2);
       setTimeout(() => navigate('/shop'), 1800);
     } catch (err: any) {
-      const msg = err.response?.data?.message || '';
+      const msg = err.response?.data?.message || err.message || '';
       setError(msg.toLowerCase().includes('taken') ? 'Email already registered.' : (msg || 'Something went wrong.'));
     } finally {
       setLoading(false);

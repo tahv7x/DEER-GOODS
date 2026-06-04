@@ -21,8 +21,8 @@ const MAD = (n: number) => `${Number(n).toFixed(2)} DH`;
 const serif = "'Cormorant Garamond', Georgia, serif";
 const isMobile = () => typeof window !== 'undefined' && window.innerWidth < 768;
 
-function ProductModal({ product, onClose, onNavigate }: {
-  product: Product; onClose: () => void; onNavigate: () => void;
+function ProductModal({ product, onClose, onNavigate, navigate }: {
+  product: Product; onClose: () => void; onNavigate: () => void; navigate: (path: string) => void;
 }) {
   const { user } = useAuth();
   const { addItem } = useCart();
@@ -38,7 +38,12 @@ function ProductModal({ product, onClose, onNavigate }: {
   const images = product.imageUrls?.length ? product.imageUrls : [];
 
   const handleAdd = () => {
-    if (!user || product.stock === 0) return;
+  if (product.stock === 0) return;
+    if (!user) {
+      onClose();
+      navigate('/login');
+      return;
+    }
     addItem({
       id: product.id, name: product.name, price: product.price,
       imageUrl: images[0] || '', category: product.Category?.name,
@@ -353,7 +358,11 @@ const Shop: React.FC = () => {
     try {
       const [p, c] = await Promise.all([apiClient.get('/products'), apiClient.get('/categories')]);
       setProducts(Array.isArray(p?.data) ? p.data : []);
-      setCategories(Array.isArray(c?.data) ? c.data : []);
+      
+      // 🔴 FIX: Njbdou les catégories w n7iydou mnhom "Custom Orders" bach matbanch l-klyan
+      const fetchedCategories = Array.isArray(c?.data) ? c.data : [];
+      setCategories(fetchedCategories.filter((cat: Category) => cat.name !== 'Custom Orders'));
+
     } catch {
       setProducts([]); setCategories([]);
     } finally { setLoading(false); }
@@ -362,17 +371,19 @@ const Shop: React.FC = () => {
   useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => products.filter(p => {
-    // ── FIX DYAL L-FILTER HNA ──
+    // 🔴 FIX: N-khebiw ga3 les produits li smyathom fihom "Commande" awla "Bespoke"
+    if (p.name.includes('Commande') || p.name === 'Bespoke Custom Piece') return false;
+
     const productCategoryId = p.categoryId || p.Category?.id;
     const catOk = activeCategory === 'ALL' || String(productCategoryId) === String(activeCategory);
     
     const qOk = !searchQuery || p.name.toLowerCase().includes(searchQuery.toLowerCase());
     const price = Number(p.price) || 0;
     const priceOk = priceRange === 'ALL' ? true
-      : priceRange === '0-500' ? price < 500
-      : priceRange === '500-1500' ? price >= 500 && price <= 1500
-      : price > 1500;
-    return catOk && qOk && priceOk;
+      : priceRange === '0-250' ? price < 250
+      : priceRange === '250-500' ? price >= 250 && price <= 500
+      : price > 500;
+          return catOk && qOk && priceOk;
   }), [products, activeCategory, searchQuery, priceRange]);
 
   const handleCardClick = (product: Product) => {
@@ -381,7 +392,7 @@ const Shop: React.FC = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', background: '#FDFCF9', color: '#1C1712' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', background: '#FDFCF9', color: '#1C1712' }}>
       <Navbar />
 
       {/* ── CSS DYAL L-MOBILE GRID BACH IBANOU 2 F S-STER ── */}
@@ -429,10 +440,10 @@ const Shop: React.FC = () => {
             <div style={{ position: 'relative', flexShrink: 0 }}>
               <select value={priceRange} onChange={e => setPriceRange(e.target.value)}
                 style={{ appearance: 'none', padding: '9px 32px 9px 14px', background: '#FDFCF9', border: '1px solid #E5E0D8', borderRadius: 10, fontSize: 11, color: '#1C1712', outline: 'none', cursor: 'pointer', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                <option value="ALL">All Prices</option>
-                <option value="0-500">Under 500 DH</option>
-                <option value="500-1500">500–1500 DH</option>
-                <option value="1500+">Over 1500 DH</option>
+                  <option value="ALL">All</option>
+                  <option value="0-250">{'UNDER 250'}</option>
+                  <option value="250-500">250–500</option>
+                  <option value="500+">{'OVER 500'}</option>
               </select>
               <ChevronDown size={13} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', color: '#9C8E80', pointerEvents: 'none' }} />
             </div>
@@ -507,7 +518,12 @@ const Shop: React.FC = () => {
 
       <AnimatePresence>
         {selectedProduct && (
-          <ProductModal product={selectedProduct} onClose={() => setSelectedProduct(null)} onNavigate={() => { navigate(`/product/${selectedProduct.id}`); setSelectedProduct(null); }} />
+          <ProductModal
+            product={selectedProduct}
+            onClose={() => setSelectedProduct(null)}
+            onNavigate={() => { navigate(`/product/${selectedProduct.id}`); setSelectedProduct(null); }}
+            navigate={navigate}
+          />
         )}
       </AnimatePresence>
 
