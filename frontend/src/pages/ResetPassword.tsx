@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { ArrowRight, Loader2, AlertCircle, Eye, EyeOff, Check, Lock } from 'lucide-react';
 import apiClient from '../services/api';
+import supabase from '../config/supabaseClient';
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 const fadeUp = {
@@ -26,27 +27,39 @@ const ResetPassword: React.FC = () => {
   const [token, setToken] = useState('');
 
   useEffect(() => {
-    const hash = window.location.hash;
-    const search = window.location.search;
-    
-    let accessToken = '';
+    const fetchSession = async () => {
+      const hash = window.location.hash;
+      const search = window.location.search;
+      
+      let accessToken = '';
 
-    if (hash) {
-      const params = new URLSearchParams(hash.replace('#', '?'));
-      accessToken = params.get('access_token') || '';
-    }
-    
-    if (!accessToken && search) {
-      const params = new URLSearchParams(search);
-      accessToken = params.get('access_token') || params.get('token') || params.get('code') || '';
-    }
+      if (hash) {
+        const params = new URLSearchParams(hash.replace('#', '?'));
+        accessToken = params.get('access_token') || '';
+      }
+      
+      if (!accessToken && search) {
+        const params = new URLSearchParams(search);
+        accessToken = params.get('access_token') || params.get('token') || params.get('code') || '';
+      }
 
-    if (accessToken) { 
-      setToken(accessToken); 
-      localStorage.setItem('token', accessToken); 
-    } else {
-      setError('Reset link is missing the token. Make sure you clicked the full link in your email.');
-    }
+      // If the URL has no token, Supabase might have already intercepted it and logged the user in.
+      if (!accessToken) {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session && session.access_token) {
+          accessToken = session.access_token;
+        }
+      }
+
+      if (accessToken) { 
+        setToken(accessToken); 
+        localStorage.setItem('token', accessToken); 
+      } else {
+        setError('Reset link is invalid or missing. Make sure you clicked the full link in your email.');
+      }
+    };
+
+    fetchSession();
   }, []);
 
   const checkStrength = (pass: string) => {
