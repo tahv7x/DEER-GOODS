@@ -27,13 +27,25 @@ const ResetPassword: React.FC = () => {
 
   useEffect(() => {
     const hash = window.location.hash;
+    const search = window.location.search;
+    
+    let accessToken = '';
+
     if (hash) {
       const params = new URLSearchParams(hash.replace('#', '?'));
-      const accessToken = params.get('access_token');
-      if (accessToken) { setToken(accessToken); localStorage.setItem('token', accessToken); }
-      else setError('Reset link is invalid or expired.');
+      accessToken = params.get('access_token') || '';
+    }
+    
+    if (!accessToken && search) {
+      const params = new URLSearchParams(search);
+      accessToken = params.get('access_token') || params.get('token') || params.get('code') || '';
+    }
+
+    if (accessToken) { 
+      setToken(accessToken); 
+      localStorage.setItem('token', accessToken); 
     } else {
-      setError('Reset link missing. Please check your email again.');
+      setError('Reset link is missing the token. Make sure you clicked the full link in your email.');
     }
   }, []);
 
