@@ -16,6 +16,7 @@ import { useCart } from '../context/CartContext';
 import Navbar from '../components/Navbar';
 import { Footer } from '../components/Footer';
 import apiClient from '../services/api';
+import supabase from '../config/supabaseClient';
 
 const MAD = (n: number) => `${Number(n).toFixed(2)} DH`;
 
@@ -42,6 +43,20 @@ const Checkout: React.FC = () => {
     address: '',
     city: 'Casablanca',
   });
+
+  useEffect(() => {
+    const fetchSupabaseUser = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user?.user_metadata?.phone) {
+          setFormData(prev => ({ ...prev, phone: data.user.user_metadata.phone }));
+        }
+      } catch (err) {
+        console.error("Error fetching user session:", err);
+      }
+    };
+    fetchSupabaseUser();
+  }, []);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>

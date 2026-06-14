@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { Navbar } from '../components/Navbar';
 import { updateProfile } from '../services/api';
 import apiClient from '../services/api'; // Zdnaha bach n-jbdou l-orders
+import supabase from '../config/supabaseClient';
 
 const ease = [0.22, 1, 0.36, 1] as [number, number, number, number];
 
@@ -66,6 +67,18 @@ const Profile: React.FC = () => {
       }
     };
     fetchUserStats();
+
+    const fetchSupabaseUser = async () => {
+      try {
+        const { data } = await supabase.auth.getUser();
+        if (data?.user?.user_metadata?.phone) {
+          setPhone(data.user.user_metadata.phone);
+        }
+      } catch (err) {
+        console.error("Error fetching user session:", err);
+      }
+    };
+    fetchSupabaseUser();
   }, []);
 
   const showToast = (msg: string, type: 'success' | 'error') => {
@@ -141,6 +154,19 @@ const Profile: React.FC = () => {
         .avatar-wrapper:hover { transform: scale(1.06); }
         .avatar-wrapper:hover .avatar-overlay { opacity: 1 !important; }
         .avatar-overlay { opacity: 0; transition: opacity 0.25s ease; }
+        
+        .profile-grid { display: grid; grid-template-columns: 300px 1fr; gap: 24px; align-items: start; }
+        .sidebar-container { position: sticky; top: 100px; display: flex; flex-direction: column; gap: 16px; }
+        
+        @media (max-width: 900px) {
+          .profile-grid { grid-template-columns: 1fr; }
+          .sidebar-container { position: relative; top: 0; z-index: 10; }
+        }
+        
+        @media (max-width: 500px) {
+          .personal-info-card { padding: 24px !important; }
+          .personal-info-header { flex-direction: column; gap: 12px; align-items: flex-start !important; }
+        }
       `}</style>
 
       <Navbar />
@@ -200,10 +226,10 @@ const Profile: React.FC = () => {
         </motion.div>
 
         {/* MAIN GRID */}
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: 24, alignItems: 'start' }}>
+        <div className="profile-grid">
 
           {/* ─── LEFT SIDEBAR ─── */}
-          <motion.div {...stagger(1)} style={{ position: 'sticky', top: 100, display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <motion.div {...stagger(1)} className="sidebar-container">
 
             {/* PROFILE CARD */}
             <div className="hover-lift" style={{

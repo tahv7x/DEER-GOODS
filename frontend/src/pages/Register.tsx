@@ -106,8 +106,9 @@ const Register: React.FC = () => {
         id: user.id, 
         name: user.user_metadata?.name || formData.name, 
         email: user.email || '', 
-        role: 'CUSTOMER' 
-      });
+        role: 'CUSTOMER',
+        phone: user.user_metadata?.phone || formData.phone
+      } as any);
       
       setStep(2);
       setTimeout(() => navigate('/shop'), 1800);
