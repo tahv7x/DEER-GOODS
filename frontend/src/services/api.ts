@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-// API Url (Backend dyalek)
-const API_URL = 'http://localhost:5000/api';
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -10,7 +9,6 @@ const apiClient = axios.create({
   },
 });
 
-// Interceptor: Kayzid l'token f l'header dyal ay requête (ila kan m-connecté)
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem('token'); 
   if (token && config.headers) {
