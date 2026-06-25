@@ -1,0 +1,138 @@
+@startuml Slide Architecture - Option A (Vertical Layers)
+!theme plain
+top to bottom direction
+
+' BRAND PALETTE
+!define COLOR_BG #F7F5F0
+!define COLOR_TEXT #2C1810
+!define COLOR_BORDER #8B7355
+!define COLOR_ACCENT #8B6914
+!define COLOR_CARD #FFFFFF
+!define COLOR_DB #D4C5B0
+
+skinparam backgroundcolor COLOR_BG
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam DefaultFontName "Inter"
+skinparam DefaultFontSize 13
+
+skinparam rectangle {
+    BackgroundColor COLOR_CARD
+    BorderColor COLOR_BORDER
+    FontColor COLOR_TEXT
+    BorderThickness 1.5
+}
+
+skinparam database {
+    BackgroundColor COLOR_DB
+    BorderColor COLOR_TEXT
+    FontColor COLOR_TEXT
+    BorderThickness 1.5
+}
+
+skinparam arrow {
+    Color COLOR_ACCENT
+    FontColor COLOR_BORDER
+    Thickness 2
+}
+
+rectangle "👤 COUCHE UTILISATEUR\n(Navigateur Web)" as user_layer {
+    rectangle "**Client / Admin**\n- Rendu dynamique (React)\n- Animations fluides (Framer Motion)" as client
+}
+
+rectangle "🎨 APPLICATION FRONTEND\n(React 19 + TypeScript + Vite)" as frontend_layer {
+    rectangle "**Interface Utilisateur**\n- Composants d'interface (Tailwind CSS)\n- Gestion de l'état (AuthContext, CartContext)\n- Appels API asynchrones (Axios)" as ReactSPA
+}
+
+rectangle "⚙️ API REST BACKEND\n(Node.js + Express + TypeScript)" as backend_layer {
+    rectangle "**Serveur d'Application**\n- Middlewares de sécurité (JWT & RBAC)\n- Validation des requêtes et Uploads (Multer)\n- Contrôleurs de routage" as APIREST
+}
+
+rectangle "💾 BASE DE DONNÉES & CLOUD\n(Supabase BaaS & Tiers)" as data_layer {
+    database "**PostgreSQL DB**\n- Modèle relationnel\n- Persistance des données" as DB
+    rectangle "**Services Supabase**\n- Supabase Auth (Sessions)\n- Supabase Storage (Images)" as BaaS
+    rectangle "**Services Externes**\n- Nodemailer (Gmail)\n- Google OAuth (Connexion)" as Ext
+}
+
+' Relations
+client ===> ReactSPA : "Interactions UI"
+ReactSPA ===> APIREST : "Requêtes HTTPS (Bearer JWT)"
+APIREST ===> DB : "CRUD SQL"
+APIREST ===> BaaS : "Uploads & Auth"
+APIREST ===> Ext : "Emails & OAuth"
+@enduml
+
+
+@startuml Slide Architecture - Option B (Horizontal Flow)
+!theme plain
+left to right direction
+
+' BRAND PALETTE
+!define COLOR_BG #F7F5F0
+!define COLOR_TEXT #2C1810
+!define COLOR_BORDER #8B7355
+!define COLOR_ACCENT #8B6914
+!define COLOR_CARD #FFFFFF
+!define COLOR_DB #D4C5B0
+
+skinparam backgroundcolor COLOR_BG
+skinparam shadowing false
+skinparam roundcorner 8
+skinparam DefaultFontName "Inter"
+skinparam DefaultFontSize 13
+
+skinparam rectangle {
+    BackgroundColor COLOR_CARD
+    BorderColor COLOR_BORDER
+    FontColor COLOR_TEXT
+    BorderThickness 1.5
+}
+
+skinparam database {
+    BackgroundColor COLOR_DB
+    BorderColor COLOR_TEXT
+    FontColor COLOR_TEXT
+    BorderThickness 1.5
+}
+
+skinparam arrow {
+    Color COLOR_ACCENT
+    FontColor COLOR_BORDER
+    Thickness 2
+}
+
+actor "Utilisateur\n(Client / Admin)" as user #2C1810;text:2C1810
+
+rectangle "Frontend (React 19 / Vite)" as frontend {
+    rectangle "**Tailwind UI**" as UI
+    rectangle "**Contexts**\n(Auth / Cart)" as State
+    rectangle "**Axios**" as Axios
+}
+
+rectangle "Backend (Node.js / Express)" as backend {
+    rectangle "**Middlewares**\n(Auth, RBAC, Upload)" as Middlewares
+    rectangle "**Routes API**\n(Orders, Products, ...)" as Routes
+}
+
+rectangle "Supabase (BaaS)" as supabase {
+    database "**PostgreSQL**" as DB
+    rectangle "**Auth & Storage**" as SupaServices
+}
+
+rectangle "Services Tiers" as Tiers {
+    [Google OAuth] as Google
+    [Nodemailer] as Mail
+}
+
+' Relations
+user --> UI : "Consulte"
+UI --> State : "Lit/Modifie"
+State --> Axios : "Déclenche"
+Axios --> Middlewares : "Requête + Token"
+Middlewares --> Routes : "Autorise"
+
+Routes --> DB : "Accède"
+Routes --> SupaServices : "Images & Sessions"
+Routes --> Mail : "Envoie confirmation"
+SupaServices --> Google : "Fédère"
+@enduml

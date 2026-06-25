@@ -2,7 +2,7 @@
 
 ## 📌 Project Overview
 
-**Leather Goods** is a full-stack e-commerce web application for a premium leather goods store. Users can browse products, filter by category, manage their cart, place orders, request custom orders, and track their purchase history. An admin panel allows managing products, categories, custom orders, users, and reviewing all customer orders.
+**DEER Goods** is a full-stack e-commerce web application for a premium leather goods store. Users can browse products, filter by category, manage their cart, place orders, request custom orders, and track their purchase history. An admin panel allows managing products, categories, custom orders, users, and reviewing all customer orders.
 
 ---
 

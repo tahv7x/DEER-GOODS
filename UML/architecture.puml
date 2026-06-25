@@ -1,0 +1,76 @@
+@startuml Architecture Diagram - DEER Goods
+
+!theme materia
+
+title DEER Goods - Solution Architecture
+
+actor "User (Customer / Admin)" as user
+
+package "Frontend (Vercel)" {
+  component "React SPA (Vite)" as frontend_app {
+    "React 19, TypeScript"
+    "Tailwind CSS, Framer Motion"
+    --
+    **Pages & Components:**
+    - Public Pages (Home, Shop)
+    - Auth (Login, Register)
+    - Customer Pages (Profile, Orders)
+    - Admin Dashboard
+    **Global State:**
+    - AuthContext, CartContext
+  }
+}
+
+package "Backend (Vercel)" {
+  component "Express REST API" as backend_api {
+    "Node.js, TypeScript"
+    --
+    **Middlewares:**
+    - Auth (JWT Verification)
+    - RBAC (Admin/Customer roles)
+    - File Upload
+    **API Routes:**
+    - /auth
+    - /users
+    - /products
+    - /orders
+    - /categories
+    - /customOrders
+  }
+}
+
+package "Supabase (BaaS)" {
+  database "PostgreSQL DB" as db {
+    folder "Tables" {
+      [User]
+      [Product]
+      [Category]
+      [Order]
+      [OrderItem]
+      [CustomOrder]
+    }
+  }
+  [Authentication] as supabase_auth
+  [Storage] as supabase_storage
+}
+
+cloud "External Services" {
+    [Google] as google_oauth
+    [Email Service] as email_service
+}
+
+' Relationships
+user --> frontend_app: "Interacts via Browser"
+
+frontend_app --> backend_api: "Makes API calls (Axios)"
+frontend_app --> supabase_auth: "Handles Login/Register (Email, Google)"
+frontend_app --> supabase_storage: "Uploads reference images"
+
+backend_api --> db: "Performs CRUD operations"
+backend_api --> supabase_auth: "Verifies user access tokens"
+backend_api --> supabase_storage: "Uploads product images"
+backend_api --> email_service: "Sends emails (Nodemailer)"
+
+supabase_auth --> google_oauth: "Delegates Google OAuth"
+
+@enduml

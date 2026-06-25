@@ -1,0 +1,176 @@
+@startuml Authentication and Authorization Flow
+!theme materia
+autonumber
+
+actor "User" as user
+participant "React Frontend (Vite)" as frontend
+database "Supabase Auth" as auth
+participant "Express Backend" as backend
+database "Supabase DB" as db
+
+== Authentication (Sign In) ==
+user -> frontend: Enters email/password or clicks Google OAuth
+frontend -> auth: signInWithPassword() / signInWithOAuth()
+auth --> frontend: Returns JWT Session (access_token)
+frontend -> frontend: Saves token in AuthContext / Session
+
+== API Request Authorization (e.g. GET /api/users) ==
+user -> frontend: Triggers action requiring Auth
+frontend -> backend: HTTP GET /api/users (Headers: Authorization: Bearer <token>)
+activate backend
+backend -> backend: authMiddleware (authenticate)
+backend -> auth: supabase.auth.getUser(token)
+activate auth
+auth --> backend: Returns user object (id)
+deactivate auth
+backend -> db: Query User table for role by ID
+activate db
+db --> backend: Returns role (CUSTOMER or ADMIN)
+deactivate db
+backend -> backend: Sets req.user = { id, role }
+
+alt req.user.role == 'ADMIN'
+    backend -> backend: isAdmin middleware checks (Success)
+    backend -> backend: Process route handler
+    backend --> frontend: HTTP 200 OK (Data)
+else req.user.role != 'ADMIN'
+    backend -> backend: isAdmin middleware checks (Failure)
+    backend --> frontend: HTTP 403 Forbidden (Accès interdit)
+end
+deactivate backend
+@enduml
+
+@startuml Order Placement and Stock Management
+!theme materia
+autonumber
+
+actor "Customer" as customer
+participant "React Frontend" as frontend
+participant "Express Backend" as backend
+database "Supabase DB" as db
+
+customer -> frontend: Clicks "Passer la commande" (Checkout)
+activate frontend
+frontend -> backend: HTTP POST /api/orders (Body: items, totalAmount, paymentMethod, phone, shippingAddress) + JWT
+activate backend
+
+backend -> backend: authMiddleware (verifies token, gets userId)
+backend -> db: Insert Order (status: 'PENDING')
+activate db
+db --> backend: Returns created Order & orderId
+deactivate db
+
+backend -> db: Insert OrderItems (quantity, priceAtPurchase, productId)
+activate db
+db --> backend: Confirmed
+deactivate db
+
+loop For each item in order
+    backend -> db: Fetch Product stock by productId
+    activate db
+    db --> backend: Returns current stock
+    deactivate db
+    backend -> backend: Calculate newStock = Math.max(0, stock - quantity)
+    backend -> db: Update Product stock
+    activate db
+    db --> backend: Confirmed
+    deactivate db
+end
+
+backend --> frontend: HTTP 201 Created (Commande effectuée avec succès)
+deactivate backend
+frontend -> frontend: Clear CartContext
+frontend --> customer: Show Order Confirmation Page
+deactivate frontend
+@enduml
+
+@startuml Custom Order Lifecycle
+!theme materia
+autonumber
+
+actor "Customer" as customer
+actor "Admin" as admin
+participant "React Frontend" as frontend
+participant "Express Backend" as backend
+database "Supabase Storage" as storage
+database "Supabase DB" as db
+
+== Step 1: Customer Submits Request ==
+customer -> frontend: Fills custom order form & uploads ref image
+activate frontend
+frontend -> storage: Uploads reference image to 'images' bucket
+activate storage
+storage --> frontend: Returns image path (e.g. custom-orders/filename)
+deactivate storage
+frontend -> backend: HTTP POST /api/customOrders (description, imageUrl) + JWT
+activate backend
+backend -> backend: authMiddleware (gets userId)
+backend -> db: Insert CustomOrder (status: 'PENDING', description, imageUrl)
+activate db
+db --> backend: Returns created CustomOrder
+deactivate db
+backend --> frontend: HTTP 201 Created (Demande envoyée avec succès)
+deactivate backend
+frontend --> customer: Show confirmation message
+deactivate frontend
+
+== Step 2: Admin Reviews & Estimates Price ==
+admin -> frontend: Accesses Admin Dashboard
+frontend -> backend: HTTP GET /api/customOrders/admin
+activate backend
+backend -> db: Fetch all CustomOrders
+activate db
+db --> backend: Returns list
+deactivate db
+backend --> frontend: Return list
+deactivate backend
+frontend --> admin: Display Custom Orders Table
+admin -> frontend: Inputs estimated price & submits quote
+frontend -> backend: HTTP PUT /api/customOrders/:id/quote (estimatedPrice)
+activate backend
+backend -> db: Update CustomOrder (estimatedPrice, status: 'QUOTED')
+activate db
+db --> backend: Success
+deactivate db
+backend --> frontend: HTTP 200 OK (Prix envoyé au client)
+deactivate backend
+
+== Step 3: Customer Accepts Quote & Order is Auto-Generated ==
+customer -> frontend: Views custom order status ('QUOTED')
+customer -> frontend: Clicks "Accepter le devis"
+frontend -> backend: HTTP PUT /api/customOrders/:id/status (status: 'ACCEPTED')
+activate backend
+backend -> db: Fetch CustomOrder details
+activate db
+db --> backend: Returns (userId, estimatedPrice, imageUrl)
+deactivate db
+
+backend -> db: Fetch or Create Category 'Custom Orders'
+activate db
+db --> backend: Returns categoryId
+deactivate db
+
+backend -> db: Create bespoke Product (name: client + " Commande", stock: 1, categoryId)
+activate db
+db --> backend: Returns bespoke product details
+deactivate db
+
+backend -> db: Create Order (totalAmount: estimatedPrice, paymentMethod: 'COD', status: 'PENDING')
+activate db
+db --> backend: Returns orderId
+deactivate db
+
+backend -> db: Create OrderItem (productId: bespoke product, quantity: 1, priceAtPurchase)
+activate db
+db --> backend: Success
+deactivate db
+
+backend -> db: Update CustomOrder (status: 'ACCEPTED')
+activate db
+db --> backend: Success
+deactivate db
+
+backend --> frontend: HTTP 200 OK (Statut mis à jour, commande générée)
+deactivate backend
+frontend --> customer: Shows order generated in history
+@enduml
