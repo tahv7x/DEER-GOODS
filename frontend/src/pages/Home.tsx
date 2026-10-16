@@ -46,10 +46,8 @@ const Home: React.FC = () => {
     apiClient.get('/products')
       .then(res => {
         if (Array.isArray(res.data)) {
-          // 🔴 HNA FIN DRNA L-FILTRE MAGIQUE 🔴
-          const recommended = res.data.filter(p => 
-            p.price < 350 && 
-            p.stock > 5 &&
+          const recommended = res.data.filter((p: any) => 
+            p.stock > 0 &&
             !p.name.includes('Commande') && 
             p.name !== 'Bespoke Custom Piece'
           );
